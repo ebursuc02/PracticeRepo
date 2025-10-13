@@ -13,7 +13,15 @@ public class ExpressionParser
     private char Current => _index < _expression.Length ? _expression[_index] : char.MinValue;
     public ExpressionParser(string expression) => _expression = expression.Replace(" ", "");
 
-    public Expression Parse() => ParseAddSub();
+    public Expression Parse()
+    {
+
+        var tree = ParseAddSub();
+        if (Current != char.MinValue)
+            throw new Exception($"Unexpected character at position {_index}");
+        return tree;
+
+    }
 
     public Expression ParseAddSub()
     {
@@ -43,7 +51,7 @@ public class ExpressionParser
 
     public Expression ParseNumber()
     {
-        if( char.IsDigit(Current) )
+        if ( char.IsDigit(Current) )
         {
             var number = new StringBuilder();
             while (char.IsDigit(Current) || Current == '.')
@@ -56,8 +64,8 @@ public class ExpressionParser
         if ( Current == '(' )
         {
             _index++;
-            var node = Parse();
-            if (Current != ')') throw new Exception($"Wrong expression: no closing parenthesis at {_index}");
+            var node = ParseAddSub();
+            if (Current != ')') throw new Exception($"No closing parenthesis at {_index}");
             _index++;
             return node;
         }

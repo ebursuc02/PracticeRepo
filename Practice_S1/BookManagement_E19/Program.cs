@@ -32,3 +32,19 @@ books[2].Borrow("R_989821");
 Console.WriteLine();
 
 library.Display();
+
+// history of each book
+foreach (Book book in books)
+{
+    if (book.History.Count == 0) continue;
+    Console.WriteLine($"History for {book.Title}, {book.Author}:");
+    foreach (var rec in book.History)
+        Console.WriteLine($"{rec.start} - {rec.end} : {rec.reader}");
+    Console.WriteLine();
+}
+
+// readers that didn't return the books until the deadline
+var missingBooks = books.Where(b => b.DueDate < DateTime.Now).ToList();
+Console.WriteLine("Missing books:");
+foreach (Book book in missingBooks)
+    Console.WriteLine($"{book.Title}, {book.Author} -> {book.BorrowedBy}\n");

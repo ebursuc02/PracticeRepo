@@ -38,4 +38,4 @@ employees[0].EditRecord(startDate.AddDays(2), location: "office");
 employees[2].EditRecord(startDate.AddDays(1), location: "office");
 employees[2].EditRecord(startDate.AddDays(3), location: "office");
 
-system.GetReportForInterval(startDate, startDate.AddDays(7));
+system.GetReportForInterval(startDate, startDate.AddDays(5));

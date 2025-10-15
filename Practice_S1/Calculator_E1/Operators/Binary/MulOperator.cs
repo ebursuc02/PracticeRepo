@@ -6,6 +6,6 @@ public sealed class MulOperator : IBinaryOperator
 {
     public string Symbol => "*";
     public int Precedence => 20;
-    public Assoc Associativity => Assoc.Left;
+    public OperatorAssociativity Associativity => OperatorAssociativity.Left;
     public double Apply(double l, double r) => l * r;
 }

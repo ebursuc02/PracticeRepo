@@ -6,6 +6,6 @@ public sealed class NegateOperator : IUnaryOperator
 {
     public string Symbol => "neg";
     public int Precedence => 30;
-    public Assoc Associativity => Assoc.Right;
+    public OperatorAssociativity Associativity => OperatorAssociativity.Right;
     public double Apply(double x) => -x;
 }

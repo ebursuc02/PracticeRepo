@@ -49,7 +49,7 @@ namespace Calculator_E1.Parsers
 
                 _index++;
 
-                var nextMin = bin.Associativity == Assoc.Left ? bin.Precedence + 1 : bin.Precedence;
+                var nextMin = bin.Associativity == OperatorAssociativity.Left ? bin.Precedence + 1 : bin.Precedence;
                 var right = ParseExpression(nextMin);
 
                 left = new Expression

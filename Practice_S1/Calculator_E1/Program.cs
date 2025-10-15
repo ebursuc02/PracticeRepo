@@ -1,16 +1,26 @@
-﻿using Calculator;
+﻿using Calculator_E1.Parsers;
 
-Console.WriteLine("Write the expression using following operators: +, -, /, %, *");
-string expression = Console.ReadLine();
+var parser = new ExpressionParser();
 
-try
+var readInput = () =>
 {
-    var parser = new ExpressionParser(expression);
-    Expression tree = parser.Parse();
-    double result = tree.Evaluate();
-    Console.WriteLine($"Result: {result}");
-}
-catch( Exception ex )
+    Console.WriteLine("Write the expression using following operators (or Enter to exit): +, -, /, %, *");
+    return Console.ReadLine() ?? string.Empty;
+};
+
+while (true)
 {
-    Console.WriteLine($"Error: {ex.Message}");
+    var input = readInput();
+    if (string.IsNullOrWhiteSpace(input)) break;
+
+    try
+    {
+        var expr = parser.Parse(input);
+        var value = expr.Evaluate();
+        Console.WriteLine($"= {value}");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error: {ex.Message}");
+    }
 }

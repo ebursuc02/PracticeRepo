@@ -1,45 +1,25 @@
-﻿namespace CinemaTicketsManagement_E17.Domain;
+﻿using CinemaTicketsManagement_E17.Domain.Abstractions;
 
-public class Session
+namespace CinemaTicketsManagement_E17.Infrastructure.Rendering;
+
+public class ConsoleSeatMapRenderer : ISeatMapRenderer
 {
-    private List<Ticket> _soldTickets = [];
-    public Room Room { get; }
-    public Movie Movie { get; }
-    public DateTime StartTime { get; }
-    public ScreenType Format { get; }
-
-    public Session(Room room, Movie movie, DateTime startTime, ScreenType format)
-    {
-        Room = room;
-        Movie = movie;
-        StartTime = startTime;
-        Format = format;
-
-        movie.AddSession(this);
-    }
-
-    public bool IsSeatSold(Seat seat) => _soldTickets.Any(t => t.Seat == seat);
-    public void AddSoldTicket(Ticket ticket) => _soldTickets.Add(ticket);
-    public double GetEarnedMoney() => _soldTickets.Sum(t => t.Price);
-    public List<Seat> GetAvailableSeats() => Room.Seats
-        .Where(s => !_soldTickets.Any(t => t.Seat.Equals(s)))
-        .ToList();
-    public void DisplaySeatsMap()
+    public void Render(Session session)
     {
         // Header
-        Console.WriteLine($"Movie: {Movie.Name}");
-        Console.WriteLine($"Start Time: {StartTime:dd MMM yyyy HH:mm}");
-        Console.WriteLine($"Room: {Room.Number}");
+        Console.WriteLine($"Movie: {session.Movie.Name}");
+        Console.WriteLine($"Start Time: {session.StartTime:dd MMM yyyy HH:mm}");
+        Console.WriteLine($"Room: {session.Room.Number}");
         Console.WriteLine();
         Console.WriteLine("Legend: A = Available   X = Sold   (blank) = no seat");
         Console.WriteLine();
 
         // Build presence & sold maps
-        var present = new HashSet<(int Row, int Num)>(Room.Seats.Select(s => (s.Row, s.Number)));
-        var sold = new HashSet<(int Row, int Num)>(_soldTickets.Select(t => (t.Seat.Row, t.Seat.Number)));
+        var present = new HashSet<(int Row, int Num)>(session.Room.Seats.Select(s => (s.Row, s.Number)));
+        var sold = new HashSet<(int Row, int Num)>(session.SoldSeats.Select(s => (s.Row, s.Number)));
 
-        int maxRow = Room.Seats.Max(s => s.Row);
-        int maxCol = Room.Seats.Max(s => s.Number);
+        int maxRow = session.Room.Seats.Max(s => s.Row);
+        int maxCol = session.Room.Seats.Max(s => s.Number);
 
         int labelW = maxRow.ToString().Length + 2; // row labels at left
         int cellW = 3;                             // width of each seat cell
@@ -83,4 +63,3 @@ public class Session
         Console.WriteLine();
     }
 }
-

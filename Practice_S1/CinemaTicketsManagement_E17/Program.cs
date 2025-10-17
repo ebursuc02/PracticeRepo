@@ -1,4 +1,5 @@
-﻿using CinemaTicketsManagement_E17.Application.Services;
+﻿using CinemaTicketsManagement_E17.Application.Results;
+using CinemaTicketsManagement_E17.Application.Services;
 using CinemaTicketsManagement_E17.Domain;
 using CinemaTicketsManagement_E17.Domain.Policies;
 using CinemaTicketsManagement_E17.Infrastructure.Rendering;
@@ -6,8 +7,14 @@ using CinemaTicketsManagement_E17.Infrastructure.Rendering;
 //
 // ----------------- Scenario entrypoint -----------------
 //
-var cinema = SeedCinema("Cinema City Iulius Mall, Iasi",
+var cinemaRes = SeedCinema("Cinema City Iulius Mall, Iasi",
     rooms: 5, seatsPerRow: 9, rowsPerRoom: 9, seed: 42);
+if (!cinemaRes.Success)
+{
+    Console.WriteLine("Error: " + cinemaRes.Error);
+    return;
+}
+var cinema = cinemaRes.Value!;
 
 var seatMapRenderer = new ConsoleSeatMapRenderer();
 var pricing = new BasicPricingStrategy();
@@ -41,22 +48,38 @@ Console.WriteLine($"Total earned for '{session.Movie.Name}' (this cinema): {tota
 // ----------------- Helpers -----------------
 //
 
-static Cinema SeedCinema(string cinemaName, int rooms, int seatsPerRow, int rowsPerRoom, int seed)
+static Result<Cinema> SeedCinema(
+    string cinemaName,
+    int rooms,
+    int seatsPerRow,
+    int rowsPerRoom,
+    int seed)
 {
     var rnd = new Random(seed);
 
-    var cinema = new Cinema(cinemaName);
+    var cinemaRes = Cinema.Create(cinemaName);
+    if (!cinemaRes.Success)
+        return Result<Cinema>.Fail($"Cinema creation failed: {cinemaRes.Error}");
+    var cinema = cinemaRes.Value!;
 
     var categories = CreateSeatCategories();
     var formats = CreateScreenFormats();
 
-    var titanic = new Movie("Titanic", duration: 210, price: 20m, screenFormats: formats);
-    cinema.AddMovie(titanic);
+    var titanicRes = Movie.Create("Titanic", duration: 210, price: 20m, screenFormats: formats);
+    if (!titanicRes.Success)
+        return Result<Cinema>.Fail($"Movie creation failed: {titanicRes.Error}");
+    var titanic = titanicRes.Value!;
+
+    var addMovieRes = cinema.AddMovie(titanic);
+    if (!addMovieRes.Success)
+        return Result<Cinema>.Fail($"AddMovie failed: {addMovieRes.Error}");
 
     for (int roomNo = 1; roomNo <= rooms; roomNo++)
     {
         var room = new Room(roomNo);
-        cinema.AddRoom(room);
+        var addRoomRes = cinema.AddRoom(room);
+        if (!addRoomRes.Success)
+            return Result<Cinema>.Fail($"AddRoom({roomNo}) failed: {addRoomRes.Error}");
 
         // seats
         for (int row = 1; row <= rowsPerRoom; row++)
@@ -68,14 +91,19 @@ static Cinema SeedCinema(string cinemaName, int rooms, int seatsPerRow, int rows
             }
         }
 
-        // one session per room, with a random format allowed by the movie
         var format = formats[rnd.Next(formats.Count)];
         var start = new DateTime(2025, 12, 1, 10, 30, 0);
-        var session = new Session(room, titanic, start, format);
-        cinema.AddSession(session);
+
+        var sessionRes = Session.Create(room, titanic, start, format);
+        if (!sessionRes.Success)
+            return Result<Cinema>.Fail($"Session creation failed in room {roomNo}: {sessionRes.Error}");
+
+        var addSessionRes = cinema.AddSession(sessionRes.Value!);
+        if (!addSessionRes.Success)
+            return Result<Cinema>.Fail($"AddSession failed in room {roomNo}: {addSessionRes.Error}");
     }
 
-    return cinema;
+    return Result<Cinema>.Ok(cinema);
 }
 
 static List<SeatCategory> CreateSeatCategories() => new()

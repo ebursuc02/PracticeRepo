@@ -1,41 +1,52 @@
-﻿using TimeCardsManagement_E20;
+﻿using TimeCardsManagement_E20.Application.Abstractions;
+using TimeCardsManagement_E20.Application.Services;
+using TimeCardsManagement_E20.Domain.Entities;
+using TimeCardsManagement_E20.Domain.Policies;
+using TimeCardsManagement_E20.Infrastructure;
 
-AttendanceSystem system = new AttendanceSystem(2);
-
-var employees = new List<Employee>
+IHolidayPolicy holidays = new FixedHolidays(new[]
 {
-    new("Alice Johnson", "EMP001"),
-    new("Bob Smith", "EMP002"),
-    new("Charlie Davis", "EMP003")
-};
+    new DateOnly(2025, 1, 1),
+    new DateOnly(2025, 12, 25)
+});
+IAttendanceRequirementPolicy requirement = new FixedAttendanceRequirement(required: 2);
 
-var startDate = new DateOnly(2025, 10, 13);
-var workDays = Enumerable.Range(0, 5).Select(offset => startDate.AddDays(offset));
+var catalog = new InMemoryProjectCatalog()
+    .AddProject("P-100", "Migration",
+        ("DES", "Design"),
+        ("DEV", "Development"),
+        ("TST", "Testing"))
+    .AddProject("P-200", "Internal Tools",
+        ("SUP", "Support"),
+        ("RND", "R&D"));
 
-// assign time card records
-foreach (var employee in employees)
-{
-    system.AddEmployee(employee);
-    List<AttendanceRecord> records = [];
-    foreach (var day in workDays)
-    {
-        records.Add(new AttendanceRecord
-        {
-            ProjectId = "PRJ-" + (100 + employees.IndexOf(employee)),
-            Task = "Development",
-            Date = day,
-            NrHours = 8,
-            Location = "remote"
-        });
-    }
-    employee.AddAttendanceRecords(records);
-}
 
-// edit records
-employees[0].EditRecord(startDate, location: "office");
-employees[0].EditRecord(startDate.AddDays(2), location: "office");
+var system = new AttendanceSystem(requirement, holidays, catalog);
 
-employees[2].EditRecord(startDate.AddDays(1), location: "office");
-employees[2].EditRecord(startDate.AddDays(3), location: "office");
+var e = Employee.Create("Jane Doe", "E001").Value!;
+system.AddEmployee(e);
 
-system.GetReportForInterval(startDate, startDate.AddDays(5));
+var start = new DateOnly(2025, 10, 20);
+var end = new DateOnly(2025, 10, 26);
+var card = system.CreateTimeCard(e.EmployeeID, start, end).Value!;
+
+// Add attendance in the created timecard
+system.AddAttendanceToCard(card.Id, "P-100", "DES", new DateOnly(2025, 10, 20), 8, WorkLocation.Office);
+system.AddAttendanceToCard(card.Id, "P-100", "DEV", new DateOnly(2025, 10, 21), 8, WorkLocation.Remote);
+system.AddAttendanceToCard(card.Id, "P-200", "SUP", new DateOnly(2025, 10, 22), 8, WorkLocation.Office);
+system.AddAttendanceToCard(card.Id, "P-100", "DES", new DateOnly(2025, 10, 23), 8, WorkLocation.Remote);
+
+// Add leave that must be approved first
+var leave = system.AddLeaveToCard(card.Id, new DateOnly(2025, 10, 24)).Value!;
+leave.Approve(); // Manager approves
+
+// Approve then submit timecard
+system.ApproveTimeCard(card.Id);
+system.SubmitTimeCard(card.Id);
+
+// Add attendance records to the employee after approval
+e.AddAttendanceRecords(card.Attendance);
+e.AddAnnualLeaveRecords(card.Leave);
+
+
+system.GetReportForInterval(start, end);

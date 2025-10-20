@@ -1,4 +1,5 @@
 ﻿using TimeCardsManagement_E20.Application.Abstractions;
+using TimeCardsManagement_E20.Application.DTOs;
 using TimeCardsManagement_E20.Application.Results;
 using TimeCardsManagement_E20.Domain.Entities;
 
@@ -23,7 +24,6 @@ public sealed class AttendanceSystem
     }
 
     // Employee and Catalog actions
-
     public void AddEmployee(Employee employee) => _employees.Add(employee);
 
     public IReadOnlyList<Project> ListProjects() => _projectCatalog.GetProjects().ToList();
@@ -32,7 +32,6 @@ public sealed class AttendanceSystem
         => _projectCatalog.GetTasksFor(projectId).ToList();
 
     // TimeCard actions
-
     public Result<TimeCard> CreateTimeCard(string employeeId, DateOnly start, DateOnly end)
     {
         if (_employees.All(e => e.EmployeeID != employeeId))
@@ -79,19 +78,19 @@ public sealed class AttendanceSystem
     }
 
     // Report
-
-    public void GetReportForInterval(DateOnly startDate, DateOnly endDate)
+    public Result<AttendanceReport> GetReportForInterval(DateOnly startDate, DateOnly endDate)
     {
         if (endDate < startDate)
+            return Result<AttendanceReport>.Fail("Invalid date interval");
+
+        var report = new AttendanceReport
         {
-            Console.WriteLine("Invalid date interval.");
-            return;
-        }
+            StartDate = startDate,
+            EndDate = endDate
+        };
 
-        Console.WriteLine($"=== ATTENDANCE REPORT [{startDate:yyyy-MM-dd} .. {endDate:yyyy-MM-dd}] ===");
-
-        int totalRequiredOfficeDays = 0;
-        int totalActualOfficeDays = 0;
+        int totalRequired = 0;
+        int totalActual = 0;
 
         foreach (var emp in _employees)
         {
@@ -99,16 +98,9 @@ public sealed class AttendanceSystem
             var leaves = emp.GetLeaveRecords(startDate, endDate);
             var approvedLeaveDays = leaves.Count(l => l.IsApproved);
 
-            int workedDays = attendance
-                .Select(r => r.Date)
-                .Distinct()
-                .Count();
-
-            int officeDays = attendance
-                .Where(r => r.Location == WorkLocation.Office)
-                .Select(r => r.Date)
-                .Distinct()
-                .Count();
+            int workedDays = attendance.Select(r => r.Date).Distinct().Count();
+            int officeDays = attendance.Where(r => r.Location == WorkLocation.Office)
+                                       .Select(r => r.Date).Distinct().Count();
 
             int businessDays = EnumerateDays(startDate, endDate)
                 .Count(d => !_holidayPolicy.IsHoliday(d, emp));
@@ -116,36 +108,29 @@ public sealed class AttendanceSystem
             int businessMinusLeave = Math.Max(0, businessDays - approvedLeaveDays);
             int requiredOfficeDays = _requirementPolicy.ComputeRequiredOfficeDays(businessMinusLeave, emp);
 
-            totalRequiredOfficeDays += requiredOfficeDays;
-            totalActualOfficeDays += officeDays;
+            totalRequired += requiredOfficeDays;
+            totalActual += officeDays;
 
-            Console.WriteLine("---------------------------------------------");
-            Console.WriteLine($"{emp.Name} ({emp.EmployeeID})");
-            foreach (var r in attendance.OrderBy(r => r.Date))
-                Console.WriteLine($"{r.Date:yyyy-MM-dd} | {r.ProjectId} | {r.Task} | {r.Location} | {r.Hours}h");
-
-            Console.WriteLine($"Worked days: {workedDays}");
-            Console.WriteLine($"Office days: {officeDays}");
-            Console.WriteLine($"Approved leave days: {approvedLeaveDays}");
-            Console.WriteLine($"Business days (excl. weekends/holidays): {businessDays}");
-            Console.WriteLine($"Required office days (policy): {requiredOfficeDays}");
-
-            var pctOfWorked = workedDays == 0 ? 0.0 : (double)officeDays / workedDays * 100.0;
-            var pctOfRequired = requiredOfficeDays == 0 ? 100.0 : (double)officeDays / requiredOfficeDays * 100.0;
-
-            Console.WriteLine($"Attendance % of worked days: {pctOfWorked:F2}%");
-            Console.WriteLine($"Compliance vs required: {officeDays}/{requiredOfficeDays} ({pctOfRequired:F2}%)");
-            Console.WriteLine($"Total hours: {emp.GetNrOfHoursForInterval(startDate, endDate)}");
+            report.Employees.Add(new EmployeeAttendanceSummary
+            {
+                Name = emp.Name,
+                EmployeeID = emp.EmployeeID,
+                Attendance = attendance.OrderBy(r => r.Date).ToList(),
+                WorkedDays = workedDays,
+                OfficeDays = officeDays,
+                ApprovedLeaveDays = approvedLeaveDays,
+                BusinessDays = businessDays,
+                RequiredOfficeDays = requiredOfficeDays,
+                TotalHours = emp.GetNrOfHoursForInterval(startDate, endDate)
+            });
         }
 
-        Console.WriteLine("=============================================");
-        var overallPct = totalRequiredOfficeDays == 0
-            ? 100.0
-            : (double)totalActualOfficeDays / totalRequiredOfficeDays * 100.0;
+        report.TotalRequiredOfficeDays = totalRequired;
+        report.TotalActualOfficeDays = totalActual;
 
-        Console.WriteLine($"Overall compliance (office days): {totalActualOfficeDays}/{totalRequiredOfficeDays} ({overallPct:F2}%)");
-        Console.WriteLine("=============================================");
+        return Result<AttendanceReport>.Ok(report);
     }
+
 
     private static IEnumerable<DateOnly> EnumerateDays(DateOnly start, DateOnly end)
     {

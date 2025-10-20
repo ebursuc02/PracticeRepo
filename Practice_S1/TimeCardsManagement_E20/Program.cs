@@ -3,6 +3,7 @@ using TimeCardsManagement_E20.Application.Services;
 using TimeCardsManagement_E20.Domain.Entities;
 using TimeCardsManagement_E20.Domain.Policies;
 using TimeCardsManagement_E20.Infrastructure;
+using TimeCardsManagement_E20.Infrastructure.Rendering;
 
 IHolidayPolicy holidays = new FixedHolidays(new[]
 {
@@ -48,5 +49,13 @@ system.SubmitTimeCard(card.Id);
 e.AddAttendanceRecords(card.Attendance);
 e.AddAnnualLeaveRecords(card.Leave);
 
+var reportRes = system.GetReportForInterval(start, end);
 
-system.GetReportForInterval(start, end);
+if (!reportRes.Success)
+{
+    Console.WriteLine($"The report couldn't be generated, error occured: {reportRes.Error}");
+    return;
+}
+
+var consoleRenderer = new ConsoleReportRenderer();
+consoleRenderer.Render(reportRes.Value!); 
